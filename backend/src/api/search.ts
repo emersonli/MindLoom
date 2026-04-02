@@ -1,13 +1,18 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../models/database';
 import { Note } from '../models/note';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Search notes by keyword
+// Apply auth middleware to all routes
+router.use(authMiddleware);
+
+// Search notes by keyword (user's own notes only)
 router.get('/', (req: Request, res: Response) => {
   try {
     const db = getDb();
+    const userId = req.user!.userId;
     const { q, tag } = req.query;
 
     if (!q && !tag) {
@@ -18,10 +23,10 @@ router.get('/', (req: Request, res: Response) => {
       SELECT DISTINCT n.* FROM notes n
       LEFT JOIN note_tags nt ON n.id = nt.note_id
       LEFT JOIN tags t ON nt.tag_id = t.id
-      WHERE 1=1
+      WHERE n.user_id = ?
     `;
     
-    const params: any[] = [];
+    const params: any[] = [userId];
 
     if (q) {
       query += ` AND (n.title LIKE ? OR n.content LIKE ?)`;

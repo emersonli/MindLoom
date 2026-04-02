@@ -5,9 +5,12 @@ import compression from 'compression';
 import dotenv from 'dotenv';
 import path from 'path';
 import { initDatabase, getDb } from './models/database';
+import authRouter from './api/auth';
 import notesRouter from './api/notes';
 import tagsRouter from './api/tags';
 import searchRouter from './api/search';
+import versionsRouter from './api/versions';
+import { cleanupExpiredSessions } from './services/auth.service';
 
 dotenv.config();
 
@@ -24,10 +27,15 @@ app.use(express.urlencoded({ extended: true }));
 // Initialize database
 initDatabase();
 
+// Cleanup expired sessions on startup
+cleanupExpiredSessions();
+
 // API Routes
+app.use('/api/auth', authRouter);
 app.use('/api/notes', notesRouter);
 app.use('/api/tags', tagsRouter);
 app.use('/api/search', searchRouter);
+app.use('/api/versions', versionsRouter);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {

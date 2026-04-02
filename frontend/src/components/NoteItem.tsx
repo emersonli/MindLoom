@@ -33,6 +33,7 @@ export default function NoteItem({ note, isSelected, onSelect, onDelete }: NoteI
 
   return (
     <div
+      data-testid={`note-item-${note.id}`}
       onClick={() => onSelect(note)}
       className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
         isSelected
@@ -64,6 +65,7 @@ export default function NoteItem({ note, isSelected, onSelect, onDelete }: NoteI
 
         {/* Delete Button */}
         <button
+          data-testid={`delete-note-button-${note.id}`}
           onClick={(e) => {
             e.stopPropagation();
             if (confirm('确定要删除这篇笔记吗？')) {

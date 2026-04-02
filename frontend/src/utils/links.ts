@@ -86,7 +86,7 @@ export function renderLinks(
   // Then replace wiki links with HTML links
   escaped = escaped.replace(
     WIKI_LINK_REGEX,
-    (match, noteTitle, displayText) => {
+    (_match, noteTitle, displayText) => {
       const title = noteTitle.trim();
       const display = displayText ? displayText.trim() : title;
       

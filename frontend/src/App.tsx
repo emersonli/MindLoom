@@ -1,51 +1,48 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Note } from './types';
+import { useNotesStore } from './stores/notesStore';
+import { useUIStore } from './stores/uiStore';
 import MarkdownEditor from './components/MarkdownEditor';
 import NoteList from './components/NoteList';
 import Backlinks from './components/Backlinks';
 import SearchResults from './components/SearchResults';
+import ExportMenu from './components/ExportMenu';
 import { searchService } from './services/search';
 
 function App() {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  // Use Zustand stores
+  const {
+    notes,
+    selectedNote,
+    isLoading,
+    error,
+    fetchNotes,
+    createNote: createNoteApi,
+    updateNote: updateNoteApi,
+    deleteNote: deleteNoteApi,
+    setSelectedNote,
+    clearError,
+  } = useNotesStore();
+
+  const {
+    theme,
+    toggleTheme,
+    showNotification,
+    notification,
+  } = useUIStore();
+
+  // Local state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Array<{note: Note; highlights: string[]}>>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSearchMode, setIsSearchMode] = useState(false);
 
-  // Mock initial notes with bidirectional links
+  // Initialize: fetch notes on mount
   useEffect(() => {
-    const mockNotes: Note[] = [
-      {
-        id: '1',
-        title: '欢迎使用 PKMS',
-        content: '<h1>欢迎使用个人知识管理系统</h1><p>这是您的第一篇笔记。使用 [[双向链接]] 功能来关联笔记。</p><p>查看 [[功能说明]] 了解更多。</p>',
-        created_at: Date.now() - 86400000,
-        updated_at: Date.now() - 86400000,
-      },
-      {
-        id: '2',
-        title: '功能说明',
-        content: '<h2>主要功能</h2><ul><li>📝 笔记管理</li><li>🏷️ 标签系统</li><li>🔗 双向链接 - 关联 [[欢迎使用 PKMS]]</li><li>🔍 全文搜索</li></ul>',
-        created_at: Date.now() - 43200000,
-        updated_at: Date.now() - 43200000,
-      },
-      {
-        id: '3',
-        title: '双向链接',
-        content: '<h2>双向链接说明</h2><p>使用 [[wiki 语法]] 可以创建笔记间的链接。查看 [[欢迎使用 PKMS]] 获得帮助。</p>',
-        created_at: Date.now() - 21600000,
-        updated_at: Date.now() - 21600000,
-      },
-    ];
-    setNotes(mockNotes);
-    
-    // Initialize search index
-    searchService.init(mockNotes);
+    fetchNotes();
   }, []);
 
-  // Re-index when notes change
+  // Re-index search when notes change
   useEffect(() => {
     if (notes.length > 0) {
       searchService.init(notes);
@@ -80,7 +77,9 @@ function App() {
         updated_at: Date.now(),
       };
       setSelectedNote(updatedNote);
-      setNotes(notes.map(n => n.id === updatedNote.id ? updatedNote : n));
+      
+      // Debounced save to API (could be improved with proper debouncing)
+      updateNoteApi(selectedNote.id, { content, updated_at: updatedNote.updated_at });
       
       // Update search index
       searchService.updateNote(updatedNote);
@@ -88,33 +87,31 @@ function App() {
   };
 
   // Handle create new note
-  const handleCreateNote = (title: string) => {
-    const newNote: Note = {
-      id: Date.now().toString(),
-      title,
-      content: '<p>使用 [[wiki 语法]] 创建链接，例如：[[笔记标题]]</p>',
-      created_at: Date.now(),
-      updated_at: Date.now(),
-    };
+  const handleCreateNote = async (title: string) => {
+    if (!title.trim()) return;
     
-    setNotes([newNote, ...notes]);
-    setSelectedNote(newNote);
-    setIsSearchMode(false);
-    setSearchQuery('');
+    const newNote = await createNoteApi(title, '<p>开始编写笔记内容...</p>');
     
-    // Add to search index
-    searchService.addNote(newNote);
+    if (newNote) {
+      searchService.addNote(newNote);
+      showNotification('笔记创建成功', 'success');
+    } else {
+      showNotification('创建笔记失败', 'error');
+    }
   };
 
   // Handle delete note
-  const handleDeleteNote = (id: string) => {
-    setNotes(notes.filter(n => n.id !== id));
-    if (selectedNote?.id === id) {
-      setSelectedNote(null);
-    }
+  const handleDeleteNote = async (id: string) => {
+    if (!confirm('确定要删除这篇笔记吗？')) return;
     
-    // Remove from search index
-    searchService.removeNote(id);
+    const success = await deleteNoteApi(id);
+    
+    if (success) {
+      searchService.removeNote(id);
+      showNotification('笔记已删除', 'success');
+    } else {
+      showNotification('删除笔记失败', 'error');
+    }
   };
 
   // Handle navigate to linked note
@@ -134,16 +131,43 @@ function App() {
     setSearchQuery('');
   };
 
+  // Handle export
+  const handleExport = (format: string) => {
+    showNotification(`导出为 ${format.toUpperCase()} 成功`, 'success');
+  };
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className={`min-h-screen ${theme === 'dark' ? 'dark bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
       {/* Header */}
       <header className="bg-gray-800 shadow">
         <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">📚 个人知识管理系统</h1>
-          <p className="text-gray-400 text-sm">MVP v0.1.0 - Phase 2.2 | P0-4 全文搜索开发中</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold">📚 个人知识管理系统</h1>
+              <p className="text-gray-400 text-sm">MindLoom PKMS v1.0</p>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {/* Theme Toggle */}
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+                title={theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
+              >
+                {theme === 'dark' ? '☀️' : '🌙'}
+              </button>
+              
+              {/* Export Menu */}
+              <ExportMenu
+                note={selectedNote || undefined}
+                notes={notes}
+                onExport={handleExport}
+              />
+            </div>
+          </div>
           
           {/* Search Bar */}
-          <div className="mt-3">
+          <div className="mt-4">
             <div className="relative">
               <input
                 type="text"
@@ -164,6 +188,37 @@ function App() {
           </div>
         </div>
       </header>
+
+      {/* Notification Toast */}
+      {notification && notification.visible && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in">
+          <div
+            className={`px-4 py-3 rounded-lg shadow-lg ${
+              notification.type === 'success' ? 'bg-green-600' :
+              notification.type === 'error' ? 'bg-red-600' :
+              notification.type === 'warning' ? 'bg-yellow-600' :
+              'bg-blue-600'
+            } text-white`}
+          >
+            {notification.message}
+          </div>
+        </div>
+      )}
+
+      {/* Error Banner */}
+      {error && (
+        <div className="container mx-auto px-4 py-2">
+          <div className="bg-red-900/50 border border-red-700 rounded-lg px-4 py-2 flex justify-between items-center">
+            <span className="text-red-200 text-sm">⚠️ {error}</span>
+            <button
+              onClick={clearError}
+              className="text-red-300 hover:text-white text-sm"
+            >
+              dismiss
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
@@ -192,6 +247,7 @@ function App() {
               <NoteList
                 notes={notes}
                 selectedNote={selectedNote}
+                isLoading={isLoading}
                 onSelectNote={(note) => { setSelectedNote(note); setIsSearchMode(false); }}
                 onDeleteNote={handleDeleteNote}
                 onCreateNote={handleCreateNote}
@@ -206,7 +262,7 @@ function App() {
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold">{selectedNote.title}</h2>
                   <span className="text-xs text-gray-400">
-                    最后更新: {new Date(selectedNote.updated_at).toLocaleString()}
+                    最后更新：{new Date(selectedNote.updated_at).toLocaleString()}
                   </span>
                 </div>
                 <MarkdownEditor

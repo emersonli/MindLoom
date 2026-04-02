@@ -1,6 +1,8 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { useEffect, useCallback } from 'react';
+import Placeholder from '@tiptap/extension-placeholder';
+import CharacterCount from '@tiptap/extension-character-count';
+import { useEffect } from 'react';
 
 interface MarkdownEditorProps {
   content: string;
@@ -16,6 +18,10 @@ export default function MarkdownEditor({ content, onChange, placeholder = 'å¼€å§
           levels: [1, 2, 3],
         },
       }),
+      Placeholder.configure({
+        placeholder,
+      }),
+      CharacterCount.configure(),
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -49,8 +55,9 @@ export default function MarkdownEditor({ content, onChange, placeholder = 'å¼€å§
   return (
     <div className="border border-gray-300 rounded-lg overflow-hidden">
       {/* Toolbar */}
-      <div className="flex flex-wrap gap-1 p-2 bg-gray-100 border-b border-gray-300">
+      <div data-testid="editor-toolbar" className="flex flex-wrap gap-1 p-2 bg-gray-100 border-b border-gray-300">
         <button
+          data-testid="editor-bold-button"
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={`px-2 py-1 rounded text-sm ${
             editor.isActive('bold') ? 'bg-gray-300' : 'hover:bg-gray-200'
@@ -60,6 +67,7 @@ export default function MarkdownEditor({ content, onChange, placeholder = 'å¼€å§
           <strong>B</strong>
         </button>
         <button
+          data-testid="editor-italic-button"
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={`px-2 py-1 rounded text-sm ${
             editor.isActive('italic') ? 'bg-gray-300' : 'hover:bg-gray-200'
@@ -168,7 +176,9 @@ export default function MarkdownEditor({ content, onChange, placeholder = 'å¼€å§
       </div>
       
       {/* Editor Content */}
-      <EditorContent editor={editor} className="min-h-[300px]" />
+      <div data-testid="note-content-editor">
+        <EditorContent editor={editor} className="min-h-[300px]" />
+      </div>
       
       {/* Character Count */}
       <div className="p-2 bg-gray-50 border-t border-gray-300 text-xs text-gray-500">

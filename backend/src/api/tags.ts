@@ -2,20 +2,28 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../models/database';
 import { Tag, CreateTagDTO } from '../models/note';
+import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Get all tags
+// Apply auth middleware to all routes
+router.use(authMiddleware);
+
+// Get all tags (with count of user's own notes)
 router.get('/', (req: Request, res: Response) => {
   try {
     const db = getDb();
+    const userId = req.user!.userId;
+    
     const tags = db.prepare('SELECT * FROM tags ORDER BY name').all() as Tag[];
     
-    // Count notes for each tag
+    // Count notes for each tag (only user's notes)
     const tagsWithCount = tags.map(tag => {
       const count = db.prepare(
-        'SELECT COUNT(*) as count FROM note_tags WHERE tag_id = ?'
-      ).get(tag.id) as { count: number };
+        `SELECT COUNT(*) as count FROM note_tags nt
+         JOIN notes n ON nt.note_id = n.id
+         WHERE nt.tag_id = ? AND n.user_id = ?`
+      ).get(tag.id, userId) as { count: number };
       
       return {
         ...tag,
@@ -29,23 +37,24 @@ router.get('/', (req: Request, res: Response) => {
   }
 });
 
-// Get tag by ID
+// Get tag by ID with notes (user's own notes only)
 router.get('/:id', (req: Request, res: Response) => {
   try {
     const db = getDb();
+    const userId = req.user!.userId;
     const tag = db.prepare('SELECT * FROM tags WHERE id = ?').get(req.params.id) as Tag | undefined;
     
     if (!tag) {
       return res.status(404).json({ error: 'Tag not found' });
     }
 
-    // Get notes with this tag
+    // Get notes with this tag (only user's notes)
     const notes = db.prepare(`
       SELECT n.* FROM notes n
       JOIN note_tags nt ON n.id = nt.note_id
-      WHERE nt.tag_id = ?
+      WHERE nt.tag_id = ? AND n.user_id = ?
       ORDER BY n.updated_at DESC
-    `).all(req.params.id);
+    `).all(req.params.id, userId);
 
     res.json({ ...tag, notes });
   } catch (error: any) {

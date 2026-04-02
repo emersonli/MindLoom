@@ -84,8 +84,9 @@ export function detectConflict(
 
 /**
  * Auto-merge metadata changes (Level 1)
+ * @deprecated - Not currently used, kept for future implementation
  */
-function autoMergeMetadata(local: NoteMetadata, remote: NoteMetadata): NoteMetadata {
+export function _autoMergeMetadata(local: NoteMetadata, remote: NoteMetadata): NoteMetadata {
   // Take the latest version
   const merged: NoteMetadata = {
     ...local,

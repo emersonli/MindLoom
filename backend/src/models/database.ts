@@ -26,6 +26,29 @@ export function initDatabase(): Database.Database {
 }
 
 function createTables(db: Database.Database): void {
+  // Users table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+
+  // Sessions table (for token management)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      token TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+
   // Notes table
   db.exec(`
     CREATE TABLE IF NOT EXISTS notes (
@@ -35,7 +58,9 @@ function createTables(db: Database.Database): void {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       encrypted INTEGER DEFAULT 0,
-      checksum TEXT
+      checksum TEXT,
+      user_id TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
 
@@ -73,12 +98,49 @@ function createTables(db: Database.Database): void {
     )
   `);
 
+  // Files table (for file uploads)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS files (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      path TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Note versions table (for version history)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS note_versions (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      version_number INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      created_by TEXT NOT NULL,
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    )
+  `);
+
   // Create indexes
+  db.exec('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_notes_user ON notes(user_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_notes_title ON notes(title)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_note_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_note_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_files_note ON files(note_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_note_versions_note_id ON note_versions(note_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_note_versions_created_at ON note_versions(created_at)');
 }
 
 export function getDb(): Database.Database {

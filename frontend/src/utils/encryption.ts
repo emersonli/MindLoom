@@ -19,7 +19,7 @@ export async function deriveKey(password: string, salt: Uint8Array): Promise<Cry
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt,
+      salt: salt.buffer as ArrayBuffer,
       iterations: ITERATIONS,
       hash: 'SHA-256',
     },
@@ -53,9 +53,9 @@ export async function encryptContent(
   const key = await deriveKey(password, salt);
   
   const encryptedBuffer = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
     key,
-    data
+    data.buffer as ArrayBuffer
   );
   
   // Convert to base64 for storage
@@ -83,9 +83,9 @@ export async function decryptContent(
   
   try {
     const decryptedBuffer = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
+      { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
       key,
-      encrypted
+      encrypted.buffer as ArrayBuffer
     );
     
     const decoder = new TextDecoder();

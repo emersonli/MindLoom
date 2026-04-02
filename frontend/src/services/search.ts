@@ -61,15 +61,12 @@ class SearchService {
     }
 
     // Perform search
-    const results = this.index.search(query, {
-      limit,
-      enrich: true,
-    });
+    const results = this.index.search(query, limit);
 
-    // Map results to Note objects
+    // Map results to Note objects (results is an array of IDs when enrich is not used)
     const matchedNotes: Note[] = [];
-    results.forEach((result: any) => {
-      const note = this.notes.get(result.id);
+    results.forEach((id) => {
+      const note = this.notes.get(String(id));
       if (note) {
         matchedNotes.push(note);
       }

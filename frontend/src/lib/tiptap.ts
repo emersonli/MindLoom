@@ -1,4 +1,3 @@
-import { Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
@@ -9,7 +8,7 @@ const PlaceholderExtension = Placeholder.configure({
 });
 
 // Character count configuration
-const CharacterCountExtension = CharacterCount;
+const CharacterCountExtension = CharacterCount.configure();
 
 // Custom extensions configuration
 export const getDefaultExtensions = () => [
@@ -45,7 +44,6 @@ export interface EditorOptions {
 export const createEditor = (options: EditorOptions = {}) => {
   const {
     content = '',
-    placeholder = '开始输入笔记内容...',
     characterLimit,
     autofocus = false,
     editable = true,

@@ -2,26 +2,42 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../models/database';
 import { Note, NoteWithTags, CreateNoteDTO, UpdateNoteDTO } from '../models/note';
+import { authMiddleware } from '../middleware/auth.middleware';
+import { createVersion } from '../models/noteVersion';
 import type Database from 'better-sqlite3';
 
 const router = Router();
 
-// Get all notes
+// Apply auth middleware to all routes
+router.use(authMiddleware);
+
+// Get all notes (user's own notes only)
 router.get('/', (req: Request, res: Response) => {
   try {
     const db = getDb();
-    const notes = db.prepare('SELECT * FROM notes ORDER BY updated_at DESC').all() as Note[];
+    const userId = req.user!.userId;
+    
+    const notes = db.prepare(
+      'SELECT * FROM notes WHERE user_id = ? ORDER BY updated_at DESC'
+    ).all(userId) as Note[];
+    
     res.json(notes);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Get note by ID with tags and links
+// Get note by ID with tags and links (user's own note only)
 router.get('/:id', (req: Request, res: Response) => {
   try {
     const db = getDb();
-    const note = db.prepare('SELECT * FROM notes WHERE id = ?').get(req.params.id) as Note | undefined;
+    const userId = req.user!.userId;
+    const noteId = req.params.id;
+    
+    // Verify note belongs to user
+    const note = db.prepare(
+      'SELECT * FROM notes WHERE id = ? AND user_id = ?'
+    ).get(noteId, userId) as Note | undefined;
     
     if (!note) {
       return res.status(404).json({ error: 'Note not found' });
@@ -32,21 +48,21 @@ router.get('/:id', (req: Request, res: Response) => {
       SELECT t.* FROM tags t
       JOIN note_tags nt ON t.id = nt.tag_id
       WHERE nt.note_id = ?
-    `).all(req.params.id);
+    `).all(noteId);
 
-    // Get outgoing links
+    // Get outgoing links (only user's notes)
     const outgoingLinks = db.prepare(`
       SELECT n.* FROM notes n
       JOIN links l ON n.id = l.target_note_id
-      WHERE l.source_note_id = ?
-    `).all(req.params.id);
+      WHERE l.source_note_id = ? AND n.user_id = ?
+    `).all(noteId, userId);
 
-    // Get incoming links (backlinks)
+    // Get incoming links (backlinks) from user's notes
     const backlinks = db.prepare(`
       SELECT n.* FROM notes n
       JOIN links l ON n.id = l.source_note_id
-      WHERE l.target_note_id = ?
-    `).all(req.params.id);
+      WHERE l.target_note_id = ? AND n.user_id = ?
+    `).all(noteId, userId);
 
     res.json({
       ...note,
@@ -63,6 +79,7 @@ router.get('/:id', (req: Request, res: Response) => {
 router.post('/', (req: Request, res: Response) => {
   try {
     const db = getDb();
+    const userId = req.user!.userId;
     const { title, content, tags }: CreateNoteDTO = req.body;
 
     if (!title) {
@@ -73,11 +90,11 @@ router.post('/', (req: Request, res: Response) => {
     const now = Date.now();
 
     const insert = db.prepare(`
-      INSERT INTO notes (id, title, content, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO notes (id, title, content, created_at, updated_at, user_id)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
-    insert.run(id, title, content || '', now, now);
+    insert.run(id, title, content || '', now, now, userId);
 
     // Add tags if provided
     if (tags && tags.length > 0) {
@@ -91,15 +108,34 @@ router.post('/', (req: Request, res: Response) => {
   }
 });
 
-// Update note
-router.put('/:id', (req: Request, res: Response) => {
+// Update note (auto-create version snapshot)
+router.put('/:id', async (req: Request, res: Response) => {
   try {
     const db = getDb();
+    const userId = req.user!.userId;
     const { title, content, tags }: UpdateNoteDTO = req.body;
 
-    const existing = db.prepare('SELECT * FROM notes WHERE id = ?').get(req.params.id);
+    // Verify note belongs to user
+    const existing = db.prepare(
+      'SELECT * FROM notes WHERE id = ? AND user_id = ?'
+    ).get(req.params.id, userId) as Note | undefined;
+    
     if (!existing) {
       return res.status(404).json({ error: 'Note not found' });
+    }
+
+    // Auto-create version snapshot before updating
+    // Only create version if title or content actually changed
+    const titleChanged = title !== undefined && title !== existing.title;
+    const contentChanged = content !== undefined && content !== existing.content;
+    
+    if (titleChanged || contentChanged) {
+      await createVersion(
+        req.params.id,
+        title !== undefined ? title : existing.title,
+        content !== undefined ? content : existing.content,
+        userId
+      );
     }
 
     const now = Date.now();
@@ -109,10 +145,10 @@ router.put('/:id', (req: Request, res: Response) => {
       SET title = COALESCE(?, title),
           content = COALESCE(?, content),
           updated_at = ?
-      WHERE id = ?
+      WHERE id = ? AND user_id = ?
     `);
 
-    update.run(title, content, now, req.params.id);
+    update.run(title, content, now, req.params.id, userId);
 
     // Update tags if provided
     if (tags) {
@@ -133,8 +169,13 @@ router.put('/:id', (req: Request, res: Response) => {
 router.delete('/:id', (req: Request, res: Response) => {
   try {
     const db = getDb();
+    const userId = req.user!.userId;
     
-    const existing = db.prepare('SELECT * FROM notes WHERE id = ?').get(req.params.id);
+    // Verify note belongs to user
+    const existing = db.prepare(
+      'SELECT * FROM notes WHERE id = ? AND user_id = ?'
+    ).get(req.params.id, userId);
+    
     if (!existing) {
       return res.status(404).json({ error: 'Note not found' });
     }
