@@ -288,4 +288,24 @@ export const exportApi = {
   html: (noteId: string) => apiClient.get<string>(`/api/export/${noteId}/html`, false),
 };
 
+// Export API endpoints for note versions (P2-01)
+export interface NoteVersion {
+  id: string;
+  note_id: string;
+  title: string;
+  content: string;
+  version_number: number;
+  created_at: number;
+  created_by: string;
+}
+
+export const versionsApi = {
+  getVersions: (noteId: string) =>
+    apiClient.get<NoteVersion[]>(`/api/versions/notes/${noteId}/versions`),
+  getVersion: (versionId: string) =>
+    apiClient.get<NoteVersion>(`/api/versions/${versionId}`),
+  restoreVersion: (versionId: string, noteId: string) =>
+    apiClient.post<{ success: boolean }>(`/api/versions/${versionId}/restore`, { noteId }),
+};
+
 export default apiClient;

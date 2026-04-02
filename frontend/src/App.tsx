@@ -7,6 +7,8 @@ import NoteList from './components/NoteList';
 import Backlinks from './components/Backlinks';
 import SearchResults from './components/SearchResults';
 import ExportMenu from './components/ExportMenu';
+import { VersionHistory } from './components/VersionHistory';
+import { versionsApi, NoteVersion } from './utils/api';
 import { searchService } from './services/search';
 
 function App() {
@@ -36,6 +38,10 @@ function App() {
   const [searchResults, setSearchResults] = useState<Array<{note: Note; highlights: string[]}>>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSearchMode, setIsSearchMode] = useState(false);
+  
+  // Version history state (P2-01)
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [currentVersionNumber, setCurrentVersionNumber] = useState<number | undefined>(undefined);
 
   // Initialize: fetch notes on mount
   useEffect(() => {
@@ -134,6 +140,36 @@ function App() {
   // Handle export
   const handleExport = (format: string) => {
     showNotification(`导出为 ${format.toUpperCase()} 成功`, 'success');
+  };
+
+  // Handle version history (P2-01)
+  const handleOpenVersionHistory = () => {
+    if (selectedNote) {
+      setShowVersionHistory(true);
+    }
+  };
+
+  const handleCloseVersionHistory = () => {
+    setShowVersionHistory(false);
+  };
+
+  const handleVersionRestore = async (versionId: string, version: NoteVersion) => {
+    if (selectedNote) {
+      // Update the selected note with restored content
+      const restoredNote = {
+        ...selectedNote,
+        title: version.title,
+        content: version.content,
+        updated_at: Date.now(),
+      };
+      setSelectedNote(restoredNote);
+      setCurrentVersionNumber(version.version_number);
+      setShowVersionHistory(false);
+      
+      // Update search index
+      searchService.updateNote(restoredNote);
+      showNotification(`已恢复到版本 v${version.version_number}`, 'success');
+    }
   };
 
   return (
@@ -269,6 +305,8 @@ function App() {
                   content={selectedNote.content}
                   onChange={handleContentChange}
                   placeholder="开始输入笔记内容... 使用 [[笔记标题]] 创建链接"
+                  noteId={selectedNote.id}
+                  onOpenVersionHistory={handleOpenVersionHistory}
                 />
               </div>
             ) : (
@@ -292,6 +330,16 @@ function App() {
           </aside>
         </div>
       </main>
+
+      {/* Version History Panel (P2-01) */}
+      {showVersionHistory && selectedNote && (
+        <VersionHistory
+          noteId={selectedNote.id}
+          currentVersionNumber={currentVersionNumber}
+          onRestore={handleVersionRestore}
+          onClose={handleCloseVersionHistory}
+        />
+      )}
     </div>
   );
 }

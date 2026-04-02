@@ -8,6 +8,8 @@ interface MarkdownEditorProps {
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
+  noteId?: string;
+  onOpenVersionHistory?: () => void;
 }
 
 export default function MarkdownEditor({ content, onChange, placeholder = '开始输入笔记内容...' }: MarkdownEditorProps) {
@@ -173,6 +175,20 @@ export default function MarkdownEditor({ content, onChange, placeholder = '开�
         >
           ↪
         </button>
+        
+        {onOpenVersionHistory && (
+          <>
+            <span className="w-px h-6 bg-gray-300 mx-1"></span>
+            <button
+              onClick={onOpenVersionHistory}
+              className="px-2 py-1 rounded text-sm hover:bg-gray-200"
+              title="查看版本历史"
+              data-testid="version-history-button"
+            >
+              📜 历史
+            </button>
+          </>
+        )}
       </div>
       
       {/* Editor Content */}
