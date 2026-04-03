@@ -97,7 +97,7 @@ pkms/
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/your-org/pkms.git
+git clone https://github.com/emersonli/MindLoom.git
 cd pkms
 
 # 2. 复制环境变量
@@ -117,19 +117,32 @@ docker-compose up -d
 
 ### 方式二：本地开发
 
+#### 前置要求
+
+- Node.js >= 20.x
+- npm >= 9.x
+
 #### 后端启动
 
 ```bash
 cd backend
 
-# 安装依赖
+# 1. 安装依赖
 npm install
 
-# 复制环境配置
-cp .env.example .env
+# 2. 复制环境配置
+cp ../.env.example .env
 
-# 启动开发服务器
+# 3. 配置环境变量
+# 编辑 .env 文件，填写 JWT_SECRET 和 PKMS_ENCRYPTION_KEY
+# 生成密钥方法:
+#   JWT_SECRET: echo "your-secret-key"
+#   PKMS_ENCRYPTION_KEY: openssl rand -base64 32
+
+# 4. 启动开发服务器 (数据库会自动初始化)
 npm run dev
+
+# 后端服务运行在 http://localhost:4000
 ```
 
 #### 前端启动
@@ -137,11 +150,25 @@ npm run dev
 ```bash
 cd frontend
 
-# 安装依赖
+# 1. 安装依赖
 npm install
 
-# 启动开发服务器
+# 2. 启动开发服务器
 npm run dev
+
+# 前端服务运行在 http://localhost:3000
+```
+
+#### 运行测试
+
+```bash
+# 后端测试
+cd backend
+npm test
+
+# 前端测试
+cd frontend
+npm test
 ```
 
 ---
@@ -245,6 +272,58 @@ npm test
 |------|----------|------|
 | 笔记删除后列表未刷新 | 低 | 待修复 |
 | 部分边界条件未覆盖 | 低 | 待修复 |
+
+---
+
+## 🔧 故障排查
+
+### 常见问题
+
+**Q1: `npm install` 失败**
+```bash
+# 清除缓存重试
+npm cache clean --force
+npm install
+
+# 或使用国内镜像
+npm config set registry https://registry.npmmirror.com
+npm install
+```
+
+**Q2: 后端启动失败 "Cannot find module"**
+```bash
+# 确保在 backend 目录下运行
+cd backend
+npm run build
+npm start
+```
+
+**Q3: 前端无法连接后端 (CORS 错误)**
+```bash
+# 检查 .env 中的 FRONTEND_URL 配置
+# 后端 .env: FRONTEND_URL=http://localhost:3000
+# 确保前后端同时启动
+```
+
+**Q4: 数据库文件不存在**
+```bash
+# 数据库会在首次启动时自动创建
+# 检查 backend/data/ 目录是否有写入权限
+mkdir -p backend/data
+chmod 755 backend/data
+```
+
+**Q5: Docker 启动失败**
+```bash
+# 检查 Docker 是否运行
+docker --version
+docker-compose --version
+
+# 重新构建并启动
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
 
 ---
 
