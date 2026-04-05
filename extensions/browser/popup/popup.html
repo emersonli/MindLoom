@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindLoom 剪藏</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">🕸️</span>
+        <span class="logo-text">MindLoom 剪藏</span>
+      </div>
+    </header>
+
+    <!-- Loading State -->
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>正在提取页面内容...</p>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main" class="main" style="display: none;">
+      <!-- Page Info -->
+      <div class="page-info">
+        <input type="text" id="title" class="title-input" placeholder="笔记标题" />
+        <div class="url-display" id="url"></div>
+      </div>
+
+      <!-- Clip Type Selector -->
+      <div class="clip-type">
+        <label class="type-label">剪藏类型:</label>
+        <div class="type-buttons">
+          <button class="type-btn active" data-type="article">
+            <span class="type-icon">📄</span>
+            <span>文章</span>
+          </button>
+          <button class="type-btn" data-type="selection">
+            <span class="type-icon">✂️</span>
+            <span>选中</span>
+          </button>
+          <button class="type-btn" data-type="full">
+            <span class="type-icon">📃</span>
+            <span>完整</span>
+          </button>
+          <button class="type-btn" data-type="screenshot">
+            <span class="type-icon">📷</span>
+            <span>截图</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Notebook Selector -->
+      <div class="notebook-selector">
+        <label class="notebook-label">保存到:</label>
+        <select id="notebook" class="notebook-select">
+          <option value="inbox">📥 收件箱</option>
+          <option value="work">💼 工作</option>
+          <option value="study">📚 学习</option>
+          <option value="life">🏠 生活</option>
+          <option value="project">📋 项目</option>
+        </select>
+      </div>
+
+      <!-- Tags Input -->
+      <div class="tags-input">
+        <label class="tags-label">标签:</label>
+        <div class="tags-container">
+          <input type="text" id="tags" class="tags-input-field" placeholder="添加标签，按回车确认" />
+          <div id="tag-suggestions" class="tag-suggestions"></div>
+        </div>
+        <div id="selected-tags" class="selected-tags"></div>
+      </div>
+
+      <!-- Notes -->
+      <div class="notes-section">
+        <label class="notes-label">备注:</label>
+        <textarea id="notes" class="notes-textarea" placeholder="添加个人备注..."></textarea>
+      </div>
+
+      <!-- Preview -->
+      <div class="preview-section">
+        <label class="preview-label">
+          <span>预览</span>
+          <button id="toggle-preview" class="preview-toggle">展开</button>
+        </label>
+        <div id="preview" class="preview-content" style="display: none;">
+          <div id="preview-text"></div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats">
+        <span id="word-count">0 字</span>
+        <span id="image-count">0 图片</span>
+      </div>
+    </div>
+
+    <!-- Footer / Actions -->
+    <footer class="footer" id="footer" style="display: none;">
+      <button id="cancel-btn" class="btn btn-secondary">取消</button>
+      <button id="save-btn" class="btn btn-primary">
+        <span class="btn-icon">💾</span>
+        <span>保存到 MindLoom</span>
+      </button>
+    </footer>
+
+    <!-- Success State -->
+    <div id="success" class="success" style="display: none;">
+      <div class="success-icon">✅</div>
+      <h3>剪藏成功!</h3>
+      <p>已保存到 <span id="saved-notebook"></span></p>
+      <button id="close-btn" class="btn btn-primary">完成</button>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="error" style="display: none;">
+      <div class="error-icon">❌</div>
+      <h3>剪藏失败</h3>
+      <p id="error-message"></p>
+      <button id="retry-btn" class="btn btn-primary">重试</button>
+      <button id="error-close-btn" class="btn btn-secondary">关闭</button>
+    </div>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

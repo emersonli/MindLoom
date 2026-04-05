@@ -8,6 +8,11 @@ import Backlinks from './components/Backlinks';
 import SearchResults from './components/SearchResults';
 import ExportMenu from './components/ExportMenu';
 import { VersionHistory } from './components/VersionHistory';
+import { KnowledgeGraph } from './components/KnowledgeGraph';
+import { TemplateSelector } from './components/TemplateSelector';
+import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
+import { useKeyboardShortcuts, defaultShortcuts } from './hooks/useKeyboardShortcuts';
+import { getAvailableTemplates, NoteTemplate } from './templates/dailyNote';
 import { versionsApi, NoteVersion } from './utils/api';
 import { searchService } from './services/search';
 
@@ -42,11 +47,35 @@ function App() {
   // Version history state (P2-01)
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [currentVersionNumber, setCurrentVersionNumber] = useState<number | undefined>(undefined);
+  
+  // Knowledge Graph state (P2-02)
+  const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false);
+  
+  // Template Selector state (P2-03)
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [templates] = useState<NoteTemplate[]>(getAvailableTemplates());
+  
+  // Keyboard Shortcuts state (P2-04)
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
   // Initialize: fetch notes on mount
   useEffect(() => {
     fetchNotes();
   }, []);
+  
+  // Register keyboard shortcuts (P2-04)
+  const shortcuts = defaultShortcuts.map(s => ({
+    ...s,
+    handler: s.key === 'n' && s.modifiers?.includes('ctrl') ? handleCreateNoteShortcut :
+             s.key === 's' && s.modifiers?.includes('ctrl') ? handleSaveShortcut :
+             s.key === 'f' && s.modifiers?.includes('ctrl') ? handleSearchShortcut :
+             s.key === 'h' && s.modifiers?.includes('ctrl') ? handleOpenVersionHistory :
+             s.key === 'd' && s.modifiers?.includes('ctrl') ? handleCreateDailyNote :
+             s.key === '/' && s.modifiers?.includes('ctrl') ? () => setShowKnowledgeGraph(!showKnowledgeGraph) :
+             s.key === '?' && s.modifiers?.includes('ctrl') ? () => setShowShortcutsHelp(true) :
+             s.handler,
+  }));
+  useKeyboardShortcuts(shortcuts);
 
   // Re-index search when notes change
   useEffect(() => {
@@ -149,6 +178,39 @@ function App() {
     }
   };
 
+  // Handle keyboard shortcuts (P2-04)
+  const handleCreateNoteShortcut = () => {
+    const title = prompt('请输入笔记标题：');
+    if (title) handleCreateNote(title);
+  };
+  
+  const handleSaveShortcut = () => {
+    if (selectedNote) {
+      showNotification('笔记已保存', 'success');
+    }
+  };
+  
+  const handleSearchShortcut = () => {
+    const searchInput = document.querySelector('input[placeholder*="搜索笔记"]') as HTMLInputElement;
+    if (searchInput) searchInput.focus();
+  };
+  
+  const handleCreateDailyNote = () => {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    const weekday = today.toLocaleDateString('zh-CN', { weekday: 'long' });
+    const title = `${dateStr} ${weekday}`;
+    
+    const existingNote = notes.find(n => n.title === title);
+    if (existingNote) {
+      setSelectedNote(existingNote);
+      showNotification('已打开今日笔记', 'success');
+    } else {
+      handleCreateNote(title);
+      showNotification('每日笔记已创建', 'success');
+    }
+  };
+
   const handleCloseVersionHistory = () => {
     setShowVersionHistory(false);
   };
@@ -199,6 +261,42 @@ function App() {
                 notes={notes}
                 onExport={handleExport}
               />
+              
+              {/* Knowledge Graph Button (P2-02) */}
+              <button
+                onClick={() => setShowKnowledgeGraph(!showKnowledgeGraph)}
+                className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+                title="知识图谱 (Ctrl+/)"
+              >
+                🕸️
+              </button>
+              
+              {/* Daily Note Button (P2-03) */}
+              <button
+                onClick={handleCreateDailyNote}
+                className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+                title="每日笔记 (Ctrl+D)"
+              >
+                📅
+              </button>
+              
+              {/* Template Selector Button (P2-03) */}
+              <button
+                onClick={() => setShowTemplateSelector(true)}
+                className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+                title="选择模板"
+              >
+                📋
+              </button>
+              
+              {/* Keyboard Shortcuts Help Button (P2-04) */}
+              <button
+                onClick={() => setShowShortcutsHelp(true)}
+                className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors"
+                title="快捷键帮助 (Ctrl+?)"
+              >
+                ⌨️
+              </button>
             </div>
           </div>
           
@@ -338,6 +436,65 @@ function App() {
           currentVersionNumber={currentVersionNumber}
           onRestore={handleVersionRestore}
           onClose={handleCloseVersionHistory}
+        />
+      )}
+      
+      {/* Knowledge Graph Modal (P2-02) */}
+      {showKnowledgeGraph && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowKnowledgeGraph(false)}
+        >
+          <div
+            className="bg-gray-800 rounded-lg w-full max-w-6xl h-[80vh] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center p-4 border-b border-gray-700">
+              <h2 className="text-xl font-bold">🕸️ 知识图谱</h2>
+              <button
+                onClick={() => setShowKnowledgeGraph(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="h-full">
+              <KnowledgeGraph
+                notes={notes}
+                onNodeClick={(noteId) => {
+                  const note = notes.find(n => n.id === noteId);
+                  if (note) {
+                    setSelectedNote(note);
+                    setShowKnowledgeGraph(false);
+                  }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Template Selector Modal (P2-03) */}
+      {showTemplateSelector && (
+        <TemplateSelector
+          templates={templates}
+          onSelect={(template) => {
+            const title = prompt('请输入笔记标题：');
+            if (title) {
+              handleCreateNote(title);
+              showNotification(`已选择模板：${template.name}`, 'success');
+            }
+            setShowTemplateSelector(false);
+          }}
+          onClose={() => setShowTemplateSelector(false)}
+        />
+      )}
+      
+      {/* Keyboard Shortcuts Help Modal (P2-04) */}
+      {showShortcutsHelp && (
+        <KeyboardShortcutsHelp
+          shortcuts={shortcuts}
+          onClose={() => setShowShortcutsHelp(false)}
         />
       )}
     </div>
